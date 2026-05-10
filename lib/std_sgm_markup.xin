@@ -1,0 +1,103 @@
+;*******************************************************************************
+; S T D _ S G M _ M A R K U P . X I N
+;-------------------------------------------------------------------------------
+; THIS PROGRAM REQUIRES OMNIMARK V6.0e5 OR GREATER TO OPERATE.
+;-------------------------------------------------------------------------------
+; M O D I F I C A T I O N   H I S T O R Y
+; ---------------------------------------
+;*******************************************************************************
+INCLUDE-GUARD 'std_sgm_markup.xin'
+
+GLOBAL SWITCH entity_sgm_rule INITIAL {TRUE}
+GLOBAL SWITCH pi_sgm_rule INITIAL {TRUE}
+GLOBAL SWITCH comment_sgm_rule INITIAL {TRUE}
+
+; ==============================================================================
+; Rule:      TRANSLATE ENTITY
+;
+; Purpose:   Catches named entities and outputs them in their original
+;            literal format (&name;) to prevent expansion during processing.
+; ==============================================================================
+TRANSLATE ENTITY NAMED ANY+=entityname WHEN entity_sgm_rule
+  OUTPUT '&%x(entityname);'
+
+
+; ==============================================================================
+; Rule:      PROCESSING-INSTRUCTION
+;
+; Purpose:   Captures SGML processing instructions (PIs) and re-outputs them
+;            using standard PI delimiters (<? ... >).
+; ==============================================================================
+PROCESSING-INSTRUCTION VALUED ANY*=>pitext WHEN pi_sgm_rule
+  OUTPUT '<?%x(pitext)>'
+
+
+; ==============================================================================
+; Rule:      MARKUP-COMMENT
+;
+; Purpose:   Captures comment and re-outputs them using standard comment
+;            (<!-- ... -->).
+; ==============================================================================
+MARKUP-COMMENT WHEN comment_sgm_rule
+  OUTPUT '%n' WHEN CONTENT OF PARENT IS ELEMENT
+  OUTPUT '<!-- %c -->'
+
+
+; ==============================================================================
+; Macro:     OutputStartTag
+;
+; Purpose:   Constructs an SGML start tag with all specified attributes.
+;            Prepends a newline if the parent has an element-only content model.
+; ==============================================================================
+MACRO OutputStartTag IS
+  DO
+    ; Add newline if its parent is an element content model.
+    OUTPUT '%n' WHEN CONTENT OF PARENT IS ELEMENT
+    OUTPUT '<%q'
+    REPEAT OVER SPECIFIED ATTRIBUTES AS attr
+      OUTPUT ' ' || KEY OF ATTRIBUTE attr || '="%v(attr)"'
+    AGAIN
+    OUTPUT '>'
+  DONE
+MACRO-END
+
+
+; ==============================================================================
+; Macro:     OutputEndTag
+;
+; Purpose:   Outputs an SGML end tag for the current element, provided the
+;            element is not declared as EMPTY or CONREF.
+; ==============================================================================
+MACRO OutputEndTag IS
+  OUTPUT '</%q>' UNLESS CONTENT IS (EMPTY OR CONREF)
+MACRO-END
+
+
+; ==============================================================================
+; Macro:     OutputThisElement
+;
+; Purpose:   A wrapper to output the current element in its entirety,
+;            including the start tag, internal content (%c), and end tag.
+; ==============================================================================
+MACRO OutputThisElement IS
+  DO
+    OutputStartTag
+    OUTPUT '%c'
+    OutputEndTag
+  DONE
+MACRO-END
+
+
+; ==============================================================================
+; Macro:     OutputThisElementArg
+;
+; Purpose:   Outputs the current element's tags but replaces the actual
+;            content with a custom provided string.
+;
+; Arguments: ARG this_content - The custom content to place between the tags.
+; ==============================================================================
+MACRO OutputThisElementArg (ARG this_content) IS
+  OutputStartTag
+  OUTPUT this_content
+  OutputEndTag
+MACRO-END

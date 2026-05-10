@@ -1,0 +1,82 @@
+;*******************************************************************************
+; S T D _ T A B L E _ B U I L D E R . X I N
+;-------------------------------------------------------------------------------
+; THIS PROGRAM REQUIRES OMNIMARK V6.0e5 OR GREATER TO OPERATE.
+;-------------------------------------------------------------------------------
+; M O D I F I C A T I O N   H I S T O R Y
+; ---------------------------------------
+;*******************************************************************************
+INCLUDE-GUARD 'std_table_builder.xin'
+
+; ==============================================================================
+; Function:  build_table_row
+;
+; Purpose:   Constructs a single CALS <row> by iterating through a shelf
+;            of column values and wrapping each in an <entry> element.
+;
+; Arguments: cols_fstsh -- Shelf of column cell values.
+;
+; Returns:   A stream containing the formatted <row> XML block.
+; ==============================================================================
+DEFINE STREAM FUNCTION build_table_row (
+  READ-ONLY STREAM cols_fstsh
+) AS
+  LOCAL STREAM row_lst
+
+  OPEN row_lst AS BUFFER
+  USING OUTPUT AS row_lst
+  DO
+    OUTPUT '%n<row>'
+    REPEAT OVER cols_fstsh
+      OUTPUT '<entry>%g(cols_fstsh)</entry>'
+    AGAIN
+    OUTPUT '</row>'
+  DONE
+  CLOSE row_lst
+
+  RETURN row_lst
+
+
+; ==============================================================================
+; Function:  build_table_header
+;
+; Purpose:   Generates the XML prologue, DTD declaration, and opening CALS
+;            table structures (title, tgroup, thead, and tbody start tag).
+;
+; Arguments: title_fst -- The title of the table.
+;
+;            headers_fstsh -- Shelf of header column labels.
+;
+; Returns:   A stream containing the complete table header and metadata.
+; ==============================================================================
+DEFINE STREAM FUNCTION build_table_header (
+  VALUE STREAM title_fst,
+  READ-ONLY STREAM headers_fstsh
+) AS
+  LOCAL STREAM header_lst
+
+  OPEN header_lst AS BUFFER
+  PUT header_lst '<?xml version="1.0" encoding="UTF-8"?>'
+  PUT header_lst '%n<!DOCTYPE table SYSTEM "simple-cals-table.dtd">'
+  PUT header_lst '%n<table>'
+  PUT header_lst '%n<title>%g(title_fst)</title>'
+  PUT header_lst '%n<tgroup cols="' || 'd' % NUMBER OF headers_fstsh || '">'
+  PUT header_lst '%n<thead>'
+  PUT header_lst build_table_row(headers_fstsh)
+  PUT header_lst '%n</thead>'
+  PUT header_lst '%n<tbody>'
+  CLOSE header_lst
+
+  RETURN header_lst
+
+
+; ==============================================================================
+; Function:  build_table_footer
+;
+; Purpose:   Returns the closing tags for the table body, group, and
+;            root table element to ensure well-formed XML.
+;
+; Returns:   A stream containing the closing </tbody>, </tgroup>, and </table> tags.
+; ==============================================================================
+DEFINE STREAM FUNCTION build_table_footer () AS
+  RETURN  '%n</tbody>%n</tgroup>%n</table>'

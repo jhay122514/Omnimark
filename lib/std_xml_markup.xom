@@ -1,0 +1,80 @@
+;*******************************************************************************
+; S T D _ X M L _ M A R K U P . X I N
+;-------------------------------------------------------------------------------
+; THIS PROGRAM REQUIRES OMNIMARK V6.0e5 OR GREATER TO OPERATE.
+;-------------------------------------------------------------------------------
+; M O D I F I C A T I O N   H I S T O R Y
+; ---------------------------------------
+;*******************************************************************************
+INCLUDE-GUARD 'std_xml_markup.xin'
+
+global switch pi_xml_rule initial {true}
+global switch comment_xml_rule initial {true}
+
+; ==============================================================================
+; Rule:      processing-instruction
+;
+; Purpose:   Captures SGML processing instructions (PIs) and re-outputs them
+;            using standard PI delimiters (<? ... >).
+; ==============================================================================
+processing-instruction valued any*=>pitext when pi_xml_rule
+  output '<?%x(pitext)?>'
+
+
+; ==============================================================================
+; Rule:      markup-comment
+;
+; Purpose:   Captures comment and re-outputs them using standard comment
+;            (<!-- ... -->).
+; ==============================================================================
+markup-comment when comment_xml_rule
+  output '%n' when content of parent is element
+  output '<!-- %c -->'
+
+
+; ==============================================================================
+; Macro:     OutputStartTag
+;
+; Purpose:   Constructs an SGML start tag with all specified attributes.
+;            Prepends a newline if the parent has an element-only content model.
+; ==============================================================================
+macro OutputStartTag is
+  do
+    ; Add newline if its parent is an element content model.
+    output '%n' when content of parent is element
+    output '<%q'
+
+    repeat over specified attributes as attr
+      output ' ' || key of attribute attr || '="%v(attr)"'
+    again
+
+    output '/' when content is (empty or conref)
+    output '>'
+  done
+macro-end
+
+
+; ==============================================================================
+; Macro:     OutputEndTag
+;
+; Purpose:   Outputs an SGML end tag for the current element, provided the
+;            element is not declared as EMPTY or CONREF.
+; ==============================================================================
+macro OutputEndTag is
+  output '</%q>' unless content is (empty or conref)
+macro-end
+
+
+; ==============================================================================
+; Macro:     OutputThisElement
+;
+; Purpose:   A wrapper to output the current element in its entirety,
+;            including the start tag, internal content (%c), and end tag.
+; ==============================================================================
+macro OutputThisElement is
+  do
+    OutputStartTag
+    output '%c'
+    OutputEndTag
+  done
+macro-end

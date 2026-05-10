@@ -1,0 +1,317 @@
+;*******************************************************************************
+; S T D _ U T I L I T I E S . X I N
+;-------------------------------------------------------------------------------
+; THIS PROGRAM REQUIRES OMNIMARK V6.0e5 OR GREATER TO OPERATE.
+;-------------------------------------------------------------------------------
+; M O D I F I C A T I O N   H I S T O R Y
+; ---------------------------------------
+;*******************************************************************************
+INCLUDE-GUARD 'std_utilities.xin'
+INCLUDE 'omutil.xin'
+
+; ==============================================================================
+; Function:  normalize_space
+;
+; Purpose:   Standardizes whitespace by stripping leading/trailing spaces and
+;            collapsing multiple internal whitespace characters into a single
+;            space.
+;
+; Arguments: text -- The source stream to be cleaned.
+;
+; Returns:   A stream containing the normalized text.
+; ==============================================================================
+DEFINE STREAM FUNCTION normalize_space (
+  VALUE STREAM text
+) AS
+  LOCAL STREAM cleaned INITIAL{''}
+
+  OPEN cleaned AS BUFFER
+  REPEAT SCAN text
+    MATCH VALUE-START WHITE-SPACE+ ; Strip
+    MATCH WHITE-SPACE+ VALUE-END   ; Strip
+    MATCH WHITE-SPACE+
+      PUT cleaned ' '
+    MATCH ANY => pAny
+      PUT cleaned pAny
+  AGAIN
+  CLOSE cleaned
+
+  RETURN cleaned
+
+
+; ==============================================================================
+; Function:  trim
+;
+; Purpose:   Removes all leading and trailing white-space characters from a
+;            string.
+;
+; Arguments: text -- The source string to be trimmed.
+;
+; Returns:   A stream with leading and trailing white-space removed.
+; ==============================================================================
+DEFINE STREAM FUNCTION trim (
+  VALUE STREAM text
+) AS
+  LOCAL STREAM cleaned INITIAL{''}
+
+  OPEN cleaned AS BUFFER
+  REPEAT SCAN text
+    MATCH VALUE-START WHITE-SPACE+ ; Strip
+    MATCH WHITE-SPACE+ VALUE-END   ; Strip
+    MATCH ANY => pAny
+      PUT cleaned pAny
+  AGAIN
+  CLOSE cleaned
+
+  RETURN cleaned
+
+
+; ==============================================================================
+; Function:  ltrim
+;
+; Purpose:   Removes all leading white-space characters from a string.
+;
+; Arguments: text -- The source stream to be trimmed.
+;
+; Returns:   A stream with leading white-space removed.
+; ==============================================================================
+DEFINE STREAM FUNCTION ltrim (
+  VALUE STREAM text
+) AS
+  LOCAL STREAM cleaned INITIAL{''}
+
+  OPEN cleaned AS BUFFER
+  REPEAT SCAN text
+    MATCH VALUE-START WHITE-SPACE+ ; Strip
+    MATCH ANY => pAny
+      PUT cleaned pAny
+  AGAIN
+  CLOSE cleaned
+
+  RETURN cleaned
+
+
+; ==============================================================================
+; Function:  rtrim
+;
+; Purpose:   Removes all  trailing white-space characters from a string.
+;
+; Arguments: text -- The source stream to be trimmed.
+;
+; Returns:   A stringstream with trailing white-space removed.
+; ==============================================================================
+DEFINE STREAM FUNCTION rtrim (
+  VALUE STREAM text
+) AS
+  LOCAL STREAM cleaned INITIAL{''}
+
+  OPEN cleaned AS BUFFER
+  REPEAT SCAN text
+    MATCH WHITE-SPACE+ VALUE-END   ; Strip
+    MATCH ANY => pAny
+      PUT cleaned pAny
+  AGAIN
+  CLOSE cleaned
+
+  RETURN cleaned
+
+
+; ==============================================================================
+; Function:  split
+;
+; Purpose:   Splits a string into a list of substrings based on a specified
+;            delimiter, with an option to ignore commas acting as numeric
+;            thousands separators.
+;
+; Arguments: text_fst -- The input stream to be split.
+;
+;            delimeter_fst -- The pattern or stream to split by.
+;
+;            split_result -- The shelf to be populated with the resulting
+;            substrings.
+;
+;            normalize_spaces -- If TRUE, normalize the white-spaces (performs
+;            trim and replacing consecutive white-spaces into a single space).
+;
+;            ignore_num_separator -- (Optional) If TRUE, prevents
+;                                    splitting on commas between digits.
+;
+; Returns:   None.
+; ==============================================================================
+DEFINE FUNCTION split (
+  VALUE STREAM text_fst,
+  VALUE STREAM delimeter_fst,
+  MODIFIABLE STREAM split_result,
+  VALUE SWITCH normalize_spaces,
+  VALUE SWITCH ignore_num_separator OPTIONAL INITIAL {FALSE}
+) AS
+  LOCAL STREAM chars        INITIAL {''}
+  LOCAL STREAM cleaned_char INITIAL {''}
+
+  CLEAR split_result
+
+  OPEN chars AS BUFFER
+
+  REPEAT SCAN text_fst
+    MATCH (DIGIT delimeter_fst DIGIT) => pGroup WHEN ignore_num_separator
+      PUT chars pGroup
+
+    MATCH delimeter_fst
+      CLOSE chars WHEN chars IS OPEN
+
+      DO WHEN normalize_spaces
+        SET cleaned_char TO normalize_space(chars)
+      ELSE
+        SET cleaned_char TO chars
+      DONE
+
+      OPEN chars AS BUFFER
+
+      SET NEW split_result TO cleaned_char WHEN LENGTH OF cleaned_char > 0
+
+    MATCH ANY => pAny
+      PUT chars pAny
+
+  AGAIN
+
+  DO WHEN chars IS OPEN
+    CLOSE chars
+
+    DO WHEN normalize_spaces
+      SET cleaned_char TO normalize_space(chars)
+    ELSE
+      SET cleaned_char TO chars
+    DONE
+
+    SET NEW split_result TO cleaned_char WHEN LENGTH OF cleaned_char > 0
+  DONE
+
+
+; ==============================================================================
+; Function:  join
+;
+; Purpose:   Concatenates all items in a stream shelf into a single string,
+;            inserting a specified separator between each item.
+;
+; Arguments: separator -- The string to insert between items
+;            (e.g., a comma or space).
+;
+;            shelves_fst -- The shelf of stream items to be joined.
+;
+; Returns:    A stream containing the joined text.
+; ==============================================================================
+DEFINE STREAM FUNCTION join (
+  VALUE STREAM separator,
+  READ-ONLY STREAM shelves_fst
+) AS
+  LOCAL STREAM joined_text
+
+  OPEN joined_text AS BUFFER
+  USING OUTPUT AS joined_text
+    REPEAT OVER shelves_fst
+      OUTPUT separator WHEN NOT #FIRST
+      OUTPUT shelves_fst
+    AGAIN
+  CLOSE joined_text
+
+  RETURN joined_text
+
+
+; ==============================================================================
+; Function:  join_words
+;
+; Purpose:   Concatenates a shelf of stream items into a single comma-separated
+;            string, using " and " before the final item.
+;
+; Arguments: shelves_fst -- The shelf of (collection of) words or phrases to
+;            be joined.
+;
+; Returns:   A stream containing the joined text.
+; ==============================================================================
+DEFINE STREAM FUNCTION join_words (
+  READ-ONLY STREAM shelves_fst
+) AS
+  LOCAL STREAM joined_text
+
+  OPEN joined_text AS BUFFER
+  USING OUTPUT AS joined_text
+    REPEAT OVER shelves_fst
+      DO WHEN #LAST AND NOT #FIRST
+        OUTPUT ' and '
+      ELSE WHEN NOT #FIRST
+        OUTPUT ', '
+      DONE
+      OUTPUT shelves_fst
+    AGAIN
+  CLOSE joined_text
+
+  RETURN joined_text
+
+
+; ==============================================================================
+; Function:  remove_tag
+;
+; Purpose:   Removes all XML/SGML tags from a string, then normalizes the
+;            remaining whitespace.
+;
+; Arguments: value stream content_fst -- The raw content containing markup.
+;
+; Returns:   A cleaned stream containing only the plain text content.
+; ==============================================================================
+DEFINE STREAM FUNCTION remove_tag (
+  VALUE STREAM content_fst
+) AS
+  LOCAL STREAM cleaned_lst INITIAL {''}
+
+  OPEN cleaned_lst AS BUFFER
+  USING OUTPUT AS cleaned_lst
+  REPEAT SCAN content_fst
+    MATCH '<' ANY-TEXT++ '>'
+    MATCH ANY => pAny
+      OUTPUT pAny
+  AGAIN
+  CLOSE cleaned_lst
+
+  SET cleaned_lst TO normalize_space(cleaned_lst)
+
+  RETURN cleaned_lst
+
+
+; ==============================================================================
+; Function:  markup_to_text
+;
+; Purpose:   To sanitize a string by escaping literal markup characters into
+;            their corresponding HTML/XML entities to prevent them from being
+;            interpreted as tags or active entities.
+;
+; Arguments: markup_fst -- The input stream containing the raw text/markup.
+;
+;            escape_entities_fsw -- A switch (Optional, default: false) that,
+;            when true, protects entities from being decoded (into literal
+;            character equivalent) by any parser by escaping their leading
+;            ampersands (&) to &amp;.
+;
+; Returns:   A stream with special characters converted to entities
+;            (&lt;, &gt;, &amp;).
+; ==============================================================================
+DEFINE STREAM FUNCTION markup_to_text (
+  VALUE STREAM markup_fst,
+  VALUE SWITCH escape_entities_fsw OPTIONAL INITIAL {FALSE}
+) AS
+  LOCAL STREAM to_text
+
+  OPEN to_text AS BUFFER
+  USING OUTPUT AS to_text
+  REPEAT SCAN markup_fst
+    MATCH '<'
+      OUTPUT '&lt;'
+    MATCH '>'
+      OUTPUT '&gt;'
+    MATCH '&' WHEN escape_entities_fsw
+      OUTPUT '&amp;'
+    MATCH ANY => pAny
+      OUTPUT pAny
+  AGAIN
+  CLOSE to_text
+
+  RETURN normalize_space(to_text)
