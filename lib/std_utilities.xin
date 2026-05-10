@@ -9,6 +9,65 @@
 INCLUDE-GUARD 'std_utilities.xin'
 INCLUDE 'omutil.xin'
 
+;===============================================================================
+; Function:  basename
+;
+; Purpose:   This function get the filename of fully qualified file path with
+;            or without its file extension.
+;
+;            Note: handles mixed slashes (win/unix). In MKS Toolkit it can handle
+;            both.
+;
+; Arguments: file_path -- Fully quaified file path.
+;
+;            remove_suffix -- Optional argument, default is false, when set to
+;            true the file suffix is removed.
+;
+; Returns:   The filename with or without its file extension.
+;===============================================================================
+DEFINE STREAM FUNCTION basename (
+  VALUE STREAM file_path,
+  VALUE SWITCH remove_suffix optional INITIAL {FALSE}
+) AS
+  DO SCAN file_path
+    MATCH ANY-TEXT** [ANY-TEXT EXCEPT '\/']+ => pFile ['\/']? VALUE-END
+      DO SCAN pFile
+        MATCH ANY-TEXT** => pFileWithOutExt '.' [ANY-TEXT EXCEPT '.']+ VALUE-END
+          WHEN remove_suffix
+          RETURN pFileWithOutExt
+        ELSE
+          RETURN pFile
+      DONE
+    ELSE
+      RETURN file_path
+  DONE
+
+
+;===============================================================================
+; Function:  dirname
+;
+; Purpose:   This function gets the directory path of a fully qualified file
+;            path by removing the trailing filename component.
+;
+;            Note: handles mixed slashes (win/unix). In MKS Toolkit it can handle
+;            both.
+;
+; Arguments: file_path -- Fully qualified file path.
+;
+; Returns:   The directory portion of the path. If no directory separator
+;            is found, it returns the original string.
+;===============================================================================
+DEFINE STREAM FUNCTION DIRNAME (
+  VALUE STREAM file_path
+) AS
+  DO SCAN file_path
+    MATCH ANY-TEXT** => pPath ['\/'] [ANY-TEXT EXCEPT '\/']*  VALUE-END
+      RETURN pPath
+    ELSE
+      RETURN file_path
+  DONE
+
+
 ; ==============================================================================
 ; Function:  normalize_space
 ;
