@@ -9,6 +9,5 @@ I created these XINs to provide standard features that Omnimark (6,7,8) is missi
 
 ## Next Steps
 
-* Upgrade to V8: I plan to move this code to Omnimark V8 (which is already in production).
-* Simplify: I will use the new features in V8 to make these tools faster and easier to maintain.
+* Migrate to Omnimark V8, to utilize its features such as sink/source*
 * Group them?
