@@ -5,9 +5,11 @@
 ;-------------------------------------------------------------------------------
 ; M O D I F I C A T I O N   H I S T O R Y
 ; ---------------------------------------
+; 04/14/2023 Jose.Sico (TCSG) Initial Build
 ;*******************************************************************************
 INCLUDE-GUARD 'std_sgm_markup.xin'
 
+GLOBAL SWITCH indent_sgm INITIAL {FALSE}
 GLOBAL SWITCH entity_sgm_rule INITIAL {TRUE}
 GLOBAL SWITCH pi_sgm_rule INITIAL {TRUE}
 GLOBAL SWITCH comment_sgm_rule INITIAL {TRUE}
@@ -51,12 +53,17 @@ MARKUP-COMMENT WHEN comment_sgm_rule
 ; ==============================================================================
 MACRO OutputStartTag IS
   DO
-    ; Add newline if its parent is an element content model.
-    OUTPUT '%n' WHEN CONTENT OF PARENT IS ELEMENT
+    DO WHEN NUMBER OF CURRENT ELEMENTS > 1
+      OUTPUT '%n' WHEN CONTENT OF PARENT IS ELEMENT
+      OUTPUT ' ' ||* ((NUMBER OF CURRENT ELEMENTS - 1) * 2) WHEN indent_sgm
+    DONE
+
     OUTPUT '<%q'
+
     REPEAT OVER SPECIFIED ATTRIBUTES AS attr
       OUTPUT ' ' || KEY OF ATTRIBUTE attr || '="%v(attr)"'
     AGAIN
+
     OUTPUT '>'
   DONE
 MACRO-END
@@ -69,7 +76,13 @@ MACRO-END
 ;            element is not declared as EMPTY or CONREF.
 ; ==============================================================================
 MACRO OutputEndTag IS
-  OUTPUT '</%q>' UNLESS CONTENT IS (EMPTY OR CONREF)
+  DO WHEN CONTENT ISNT EMPTY
+    DO WHEN CONTENT ISNT MIXED
+      OUTPUT '%n'
+      OUTPUT ' ' REPEATED ((NUMBER OF CURRENT ELEMENTS - 1) * 2) WHEN indent_sgm
+    DONE
+    OUTPUT '</%q>'
+  DONE
 MACRO-END
 
 
